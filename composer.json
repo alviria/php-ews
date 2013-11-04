@@ -1,9 +1,9 @@
 {
-    "name": "jamesiarmes/php-ews",
+    "name": "alviria/php-ews",
     "type": "library",
     "description": "PHP Exchange Web Services",
     "keywords": ["exchange", "php"],
-    "homepage": "https://github.com/jamesiarmes/php-ews/wiki",
+    "homepage": "https://github.com/alviria/php-ews/wiki",
     "license": "n.a.",
     "authors": [
         {"name": "Jame Iarmes", "email": ""},
