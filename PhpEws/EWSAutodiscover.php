@@ -14,7 +14,7 @@ use XMLWriter;
  * Exchange Web Services Autodiscover implementation
  *
  * This class supports POX (Plain Old XML), which is deprecated but functional
- * in Exchange 2010. It may make sense for you to combine your Autodiscovery 
+ * in Exchange 2010. It may make sense for you to combine your Autodiscovery
  * efforts with a SOAP Autodiscover request as well.
  *
  * USAGE:
@@ -45,6 +45,7 @@ class EWSAutodiscover
      */
     const AUTODISCOVER_PATH = '/autodiscover/autodiscover.xml';
 
+    const AUTODISCOVERED_VIA_IP = 9;
     /**
      * Server was discovered using the TLD method.
      *
@@ -140,7 +141,7 @@ class EWSAutodiscover
 
     /**
      * Skip SSL verification. Bad idea, and violates the strict Autodiscover
-     * protocol. But, here in case you have no other option. 
+     * protocol. But, here in case you have no other option.
      * Defaults to FALSE.
      *
      * @var boolean
@@ -148,7 +149,7 @@ class EWSAutodiscover
     protected $skip_ssl_verification = false;
 
     /**
-     * An associative array of response headers that resulted from the 
+     * An associative array of response headers that resulted from the
      * last request. Keys are lowercased for easy checking.
      *
      * @var array
@@ -170,7 +171,7 @@ class EWSAutodiscover
     public $last_curl_errno;
 
     /**
-     * Human-readable description of the most recent cURL error. 
+     * Human-readable description of the most recent cURL error.
      *
      * @var string
      */
@@ -186,7 +187,7 @@ class EWSAutodiscover
     public $connection_timeout = 2;
 
     /**
-     * Information about an Autodiscover Response containing an error will 
+     * Information about an Autodiscover Response containing an error will
      * be stored here.
      *
      * @var mixed
@@ -194,7 +195,7 @@ class EWSAutodiscover
     public $error = false;
 
     /**
-     * Information about an Autodiscover Response with a redirect will be 
+     * Information about an Autodiscover Response with a redirect will be
      * retained here.
      *
      * @var mixed
@@ -210,7 +211,7 @@ class EWSAutodiscover
     public $discovered = null;
 
     /**
-     * Constructor for the EWSAutodiscover class. 
+     * Constructor for the EWSAutodiscover class.
      *
      * @param string $email
      * @param string $password
@@ -229,6 +230,11 @@ class EWSAutodiscover
         $this->setTLD();
     }
 
+	public function setIP($ip)
+	{
+		$this->ip = $ip;
+	}
+
     /**
      * Execute the full discovery chain of events in the correct sequence
      * until a valid response is received, or all methods have failed.
@@ -239,15 +245,24 @@ class EWSAutodiscover
     {
         $result = $this->tryTLD();
 
-        if ($result === false) {
+		echo 'tryTLD failed' . PHP_EOL;
+
+		if ($result == false) {
+			$result = $this->tryIP();
+		}
+
+        if ($result == false) {
+			echo 'tryIP failed' . PHP_EOL;
             $result = $this->trySubdomain();
         }
 
-        if ($result === false) {
+        if ($result == false) {
+			echo 'trySubdomain failed' . PHP_EOL;
             $result = $this->trySubdomainUnauthenticatedGet();
         }
 
-        if ($result === false) {
+        if ($result == false) {
+			echo 'trySubdomainunauth failed' . PHP_EOL;
             $result = $this->trySRVRecord();
         }
 
@@ -258,7 +273,7 @@ class EWSAutodiscover
      * Return the settings discovered from the Autodiscover process.
      *
      * NULL indicates discovery hasn't completed (or been attempted)
-     * FALSE indicates discovery wasn't successful. Check for errors 
+     * FALSE indicates discovery wasn't successful. Check for errors
      *  or redirects.
      * An array will be returned with discovered settings on success.
      *
@@ -350,17 +365,18 @@ class EWSAutodiscover
     public function newEWS()
     {
         // Discovery not yet attempted.
-        if ($this->discovered === null) {
+        if ($this->discovered == null) {
             $this->discover();
         }
 
         // Discovery not successful.
-        if ($this->discovered === false) {
+        if ($this->discovered == false) {
             return false;
         }
 
         $server = false;
         $version = null;
+
 
         // Pick out the host from the EXPR (Exchange RPC over HTTP).
         foreach ($this->discovered['Account']['Protocol'] as $protocol) {
@@ -376,11 +392,10 @@ class EWSAutodiscover
                 }
             }
 
-            if ($protocol['Type'] == 'EXPR' && isset($protocol['Server'])) {
+            if (($protocol['Type'] == 'EXCH' || $protocol['Type'] == 'EXPR') && isset($protocol['Server'])) {
                 $server = $protocol['Server'];
             }
         }
-
         if ($server) {
             if ($version === null) {
                 // EWS class default.
@@ -412,9 +427,9 @@ class EWSAutodiscover
         return $auto->newEWS();
     }
 
-    /** 
-     * Perform an NTLM authenticated HTTPS POST to the top-level 
-     * domain of the email address. 
+    /**
+     * Perform an NTLM authenticated HTTPS POST to the top-level
+     * domain of the email address.
      *
      * @return An AUTODISCOVERED_VIA_* constant or FALSE on failure.
      */
@@ -430,7 +445,24 @@ class EWSAutodiscover
     }
 
     /**
-     * Perform an NTLM authenticated HTTPS POST to the 'autodiscover' 
+     * Perform an NTLM authenticated HTTPS POST to the top-level
+     * domain of the email address.
+     *
+     * @return An AUTODISCOVERED_VIA_* constant or FALSE on failure.
+     */
+    public function tryIP()
+    {
+        $url = 'https://' . $this->ip . self::AUTODISCOVER_PATH;
+        $result = $this->doNTLMPost($url, 5);
+        if ($result) {
+            return self::AUTODISCOVERED_VIA_IP;
+        }
+
+        return false;
+    }
+
+    /**
+     * Perform an NTLM authenticated HTTPS POST to the 'autodiscover'
      * subdomain of the email address' TLD.
      *
      * @return An AUTODISCOVERED_VIA_* constant or FALSE on failure.
@@ -532,7 +564,7 @@ class EWSAutodiscover
     /**
      * Set the path to the file to be used by CURLOPT_CAPATH.
      *
-     * @param string $path Path to a directory containing one or more CA 
+     * @param string $path Path to a directory containing one or more CA
      * certificates.
      * @return self
      */
@@ -566,7 +598,7 @@ class EWSAutodiscover
      * @param integer $timeout Overall cURL timeout for this request
      * @return boolean
      */
-    public function doNTLMPost($url, $timeout = 6)
+    public function doNTLMPost($url, $timeout = 20)
     {
         $this->reset();
 
@@ -584,8 +616,8 @@ class EWSAutodiscover
             CURLOPT_HEADER          => false,
             CURLOPT_HEADERFUNCTION  => array($this, 'readHeaders'),
             CURLOPT_IPRESOLVE       => CURL_IPRESOLVE_V4,
-            CURLOPT_SSL_VERIFYPEER  => true,
-            CURLOPT_SSL_VERIFYHOST  => true,
+            CURLOPT_SSL_VERIFYPEER  => false,
+            CURLOPT_SSL_VERIFYHOST  => false,
         );
 
         // Set the appropriate content-type.
@@ -611,16 +643,17 @@ class EWSAutodiscover
         $this->last_curl_error  = curl_error($ch);
 
         if ($this->last_curl_errno != CURLE_OK) {
+			var_dump($this->last_curl_error);
             return false;
         }
 
         $discovered = $this->parseAutodiscoverResponse();
 
-        return $discovered;
+		return $discovered;
     }
 
     /**
-     * Parse the Autoresponse Payload, particularly to determine if an 
+     * Parse the Autoresponse Payload, particularly to determine if an
      * additional request is necessary.
      *
      * @return mixed FALSE if response isn't XML or parsed response array
@@ -678,7 +711,7 @@ class EWSAutodiscover
     }
 
     /**
-     * Reset the response-related structures. Called before making a new 
+     * Reset the response-related structures. Called before making a new
      * request.
      *
      * @return self
@@ -764,7 +797,7 @@ class EWSAutodiscover
     }
 
     /**
-     * Recursive method for parsing DOM nodes. 
+     * Recursive method for parsing DOM nodes.
      *
      * @link https://github.com/gaarf/XML-string-to-PHP-array
      * @param object $node DOMNode object

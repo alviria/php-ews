@@ -26,4 +26,6 @@ class FieldOrderType extends EWSType
      * @var EWSType_SortDirectionType
      */
     public $Order;
+
+	public $FieldURI;
 }
